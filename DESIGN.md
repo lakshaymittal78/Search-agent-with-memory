@@ -3,6 +3,7 @@
 ## Problem and approach
 
 The main problem this agent solves is connecting past conversations with current information. The sample questions generally follow this pattern: *We discussed something at a particular time. What did we establish, and is it still true today?*
+<img width="1668" height="2776" alt="mermaid-diagram (1)" src="https://github.com/user-attachments/assets/8c46f18b-b658-447e-8dd6-d592df04a247" />
 
 This requires two capabilities:
 
