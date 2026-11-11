@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Search Agent</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --panel: #ffffff; --side: #f3f1ed; --text: #1d1c1a; --muted: #6f6b64;
+    --border: #e4e0d9; --accent: #c2622d; --accent-soft: #f6e7dc; --user: #efece6; --code: #f1eee9;
+    --ok: #2f7d4f; --warn: #a3541b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1a18; --panel: #22211f; --side: #171614; --text: #ece9e4; --muted: #a29d94;
+      --border: #34322e; --accent: #e08a55; --accent-soft: #3a2a1f; --user: #2c2a27; --code: #2a2825;
+      --ok: #6cc28f; --warn: #e5a36f;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; display: flex; }
+  aside { width: 260px; background: var(--side); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+  aside header { padding: 16px; display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+  aside h1 { font-size: 15px; margin: 0; letter-spacing: .2px; }
+  button { font: inherit; cursor: pointer; }
+  .new { border: 1px solid var(--border); background: var(--panel); color: var(--text); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+  #convs { overflow-y: auto; flex: 1; padding: 0 8px 16px; }
+  .conv { display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--text); padding: 8px 10px; border-radius: 8px; font-size: 13px; }
+  .conv:hover, .conv.active { background: var(--border); }
+  .conv small { display: block; color: var(--muted); font-size: 11.5px; }
+  main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #log { flex: 1; overflow-y: auto; padding: 24px 16px 8px; }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  .msg { margin: 0 0 22px; }
+  .msg.user .bubble { background: var(--user); padding: 10px 14px; border-radius: 14px; display: inline-block; max-width: 85%; white-space: pre-wrap; }
+  .msg.user { text-align: right; }
+  .meta { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+  .steps { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .chip { font-size: 12px; border: 1px solid var(--border); background: var(--panel); border-radius: 999px; padding: 2px 10px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip.mem { background: var(--accent-soft); color: var(--text); border-color: transparent; }
+  .chip.live::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: middle; animation: pulse 1s infinite; }
+  .chip.err { color: var(--warn); }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .answer p { margin: 0 0 10px; }
+  .answer h1, .answer h2, .answer h3 { font-size: 16px; margin: 16px 0 6px; }
+  .answer ul, .answer ol { margin: 0 0 10px; padding-left: 22px; }
+  .answer code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  .answer pre { background: var(--code); padding: 10px 12px; border-radius: 8px; overflow-x: auto; }
+  .answer pre code { background: none; padding: 0; }
+  .answer a { color: var(--accent); text-decoration: none; }
+  .answer a:hover { text-decoration: underline; }
+  .answer table { border-collapse: collapse; margin: 6px 0 12px; font-size: 13.5px; display: block; overflow-x: auto; }
+  .answer th, .answer td { border: 1px solid var(--border); padding: 5px 9px; text-align: left; vertical-align: top; }
+  .answer th { background: var(--side); }
+  .sources { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .sources a { font-size: 12px; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 1px 8px; text-decoration: none; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .error { color: var(--warn); font-size: 13px; }
+  form { padding: 12px 16px 18px; }
+  .composer { max-width: 760px; margin: 0 auto; display: flex; gap: 8px; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 8px; }
+  textarea { flex: 1; resize: none; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; padding: 6px 8px; max-height: 200px; }
+  .send { border: 0; background: var(--accent); color: #fff; border-radius: 10px; padding: 0 16px; }
+  .send:disabled { opacity: .5; cursor: default; }
+  .empty { color: var(--muted); text-align: center; margin-top: 18vh; }
+  .empty h2 { color: var(--text); font-size: 20px; margin-bottom: 6px; }
+  .ex { display: inline-block; margin: 4px; border: 1px solid var(--border); background: var(--panel); color: var(--text); border-radius: 10px; padding: 6px 12px; font-size: 13px; }
+  @media (max-width: 720px) { aside { display: none; } #log { padding: 16px 16px 8px; } }
+</style>
+</head>
+<body>
+<aside>
+  <header><h1>Search Agent</h1><button class="new" id="newChat">+ New</button></header>
+  <div id="convs"></div>
+</aside>
+<main>
+  <div id="log"><div class="wrap" id="thread"></div></div>
+  <form id="form">
+    <div class="composer">
+      <textarea id="input" rows="1" placeholder="Ask anything, including about our past conversations…" autofocus></textarea>
+      <button class="send" id="send" type="submit">Send</button>
+    </div>
+  </form>
+</main>
+<script>
+const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+const $ = (id) => document.getElementById(id);
+let conversationId = null;
+let controller = null;
+
+// ── tiny, safe markdown renderer (escape first, then format) ───────────────
+const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function inline(s) {
+  return esc(s)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+}
+function md(src) {
+  const lines = src.replace(/\r/g, "").split("\n");
+  let out = "", i = 0;
+  while (i < lines.length) {
+    const l = lines[i];
+    if (/^```/.test(l)) {
+      const buf = []; i++;
+      while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]);
+      i++; out += `<pre><code>${esc(buf.join("\n"))}</code></pre>`; continue;
+    }
+    if (/^\s*\|.*\|\s*$/.test(l) && /^\s*\|?[\s:-]+\|/.test(lines[i + 1] || "")) {
+      const row = (r) => r.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+      const head = row(l); i += 2; const body = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) body.push(row(lines[i++]));
+      out += `<table><thead><tr>${head.map((h) => `<th>${inline(h)}</th>`).join("")}</tr></thead><tbody>${body.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+      continue;
+    }
+    const h = l.match(/^(#{1,4})\s+(.*)/);
+    if (h) { out += `<h3>${inline(h[2])}</h3>`; i++; continue; }
+    if (/^\s*([-*]|\d+\.)\s+/.test(l)) {
+      const ordered = /^\s*\d+\./.test(l); const items = [];
+      while (i < lines.length && /^\s*([-*]|\d+\.)\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*([-*]|\d+\.)\s+/, ""));
+      out += `<${ordered ? "ol" : "ul"}>${items.map((it) => `<li>${inline(it)}</li>`).join("")}</${ordered ? "ol" : "ul"}>`;
+      continue;
+    }
+    if (!l.trim()) { i++; continue; }
+    const para = [];
+    while (i < lines.length && lines[i].trim() && !/^(```|#{1,4}\s|\s*([-*]|\d+\.)\s|\s*\|)/.test(lines[i])) para.push(lines[i++]);
+    if (!para.length) para.push(lines[i++]);
+    out += `<p>${inline(para.join("\n")).replace(/\n/g, "<br>")}</p>`;
+  }
+  return out;
+}
+
+// ── rendering ──────────────────────────────────────────────────────────────
+const thread = $("thread");
+const scroll = () => { const log = $("log"); log.scrollTop = log.scrollHeight; };
+const fmtWhen = (iso) => new Date(iso).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+function emptyState() {
+  const ex = [
+    "What's new in the latest Node.js release?",
+    "Compare Neon, Supabase and Render Postgres pricing",
+    "What did I ask you last week?",
+  ];
+  thread.innerHTML = `<div class="empty"><h2>Ask me anything</h2><p>I search the web for anything time-sensitive, and I remember our past conversations by date.</p>${ex.map((e) => `<button class="ex">${esc(e)}</button>`).join("")}</div>`;
+  thread.querySelectorAll(".ex").forEach((b) => b.onclick = () => { $("input").value = b.textContent; $("form").requestSubmit(); });
+}
+
+function addUser(text, when) {
+  const d = document.createElement("div");
+  d.className = "msg user";
+  d.innerHTML = `<div class="bubble">${esc(text)}</div>${when ? `<div class="meta">${fmtWhen(when)}</div>` : ""}`;
+  thread.appendChild(d);
+}
+function addAssistant() {
+  const d = document.createElement("div");
+  d.className = "msg assistant";
+  d.innerHTML = `<div class="steps"></div><div class="answer"></div><div class="sources"></div>`;
+  thread.appendChild(d);
+  return { el: d, steps: d.querySelector(".steps"), answer: d.querySelector(".answer"), sources: d.querySelector(".sources") };
+}
+function renderSources(box, sources) {
+  box.innerHTML = (sources || []).slice(0, 8).map((s) => {
+    let host = s.url; try { host = new URL(s.url).hostname.replace(/^www\./, ""); } catch {}
+    return `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" title="${esc(s.title)}">${esc(host)}</a>`;
+  }).join("");
+}
+
+// ── conversations ──────────────────────────────────────────────────────────
+async function loadConversations() {
+  const list = await fetch("/api/conversations").then((r) => r.json());
+  $("convs").innerHTML = list.map((c) => `<button class="conv ${c.id === conversationId ? "active" : ""}" data-id="${c.id}">${esc(c.title)}<small>${fmtWhen(c.updatedAt)}</small></button>`).join("");
+  $("convs").querySelectorAll(".conv").forEach((b) => b.onclick = () => openConversation(b.dataset.id));
+}
+async function openConversation(id) {
+  conversationId = id;
+  const turns = await fetch(`/api/conversations/${id}`).then((r) => r.json());
+  thread.innerHTML = "";
+  for (const t of turns) {
+    addUser(t.userText, t.createdAt);
+    const a = addAssistant();
+    a.answer.innerHTML = md(t.assistantText);
+    renderSources(a.sources, t.sources);
+  }
+  loadConversations(); scroll();
+}
+$("newChat").onclick = () => { conversationId = null; emptyState(); loadConversations(); $("input").focus(); };
+
+// ── sending + SSE parsing ──────────────────────────────────────────────────
+async function send(text) {
+  if (thread.querySelector(".empty")) thread.innerHTML = "";
+  addUser(text, new Date().toISOString());
+  const a = addAssistant();
+  const chips = new Map();
+  let answer = "";
+  let pending = false;
+  const paint = () => { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; a.answer.innerHTML = md(answer); scroll(); }); };
+  const thinking = document.createElement("span");
+  thinking.className = "chip live"; thinking.textContent = "Thinking";
+  a.steps.appendChild(thinking);
+
+  controller = new AbortController();
+  setBusy(true);
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversationId, message: text, timezone: TZ }),
+      signal: controller.signal,
+    });
+    if (!res.ok || !res.body) throw new Error(`Server error ${res.status}`);
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += value;
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const raw = buf.slice(0, idx); buf = buf.slice(idx + 2);
+        const data = raw.split("\n").filter((l) => l.startsWith("data:")).map((l) => l.slice(5).trim()).join("\n");
+        if (!data) continue;
+        const e = JSON.parse(data);
+        switch (e.type) {
+          case "start": conversationId = e.conversationId; break;
+          case "memory":
+            for (const m of e.items) {
+              const c = document.createElement("span");
+              c.className = "chip mem";
+              c.textContent = m.found ? `Recalled ${m.found} from ${m.label}` : `Nothing on ${m.label}`;
+              a.steps.insertBefore(c, thinking);
+            }
+            break;
+          case "search_start": {
+            const c = document.createElement("span");
+            c.className = "chip live"; c.title = e.query;
+            c.textContent = `Searching: ${e.query}${e.since ? ` (since ${e.since})` : ""}`;
+            a.steps.insertBefore(c, thinking); chips.set(e.id, c); break;
+          }
+          case "search_end": {
+            const c = chips.get(e.id);
+            if (c) { c.classList.remove("live"); if (e.error) { c.classList.add("err"); c.textContent += " (failed)"; } else c.textContent = c.textContent.replace("Searching:", "Searched:") + ` · ${e.count}`; }
+            break;
+          }
+          case "text": thinking.remove(); answer += e.delta; paint(); break;
+          case "done": renderSources(a.sources, e.sources); break;
+          case "error": { const p = document.createElement("div"); p.className = "error"; p.textContent = e.message; a.el.appendChild(p); break; }
+        }
+        scroll();
+      }
+    }
+  } catch (err) {
+    if (err.name !== "AbortError") { const p = document.createElement("div"); p.className = "error"; p.textContent = err.message; a.el.appendChild(p); }
+  } finally {
+    thinking.remove();
+    a.steps.querySelectorAll(".live").forEach((c) => c.classList.remove("live"));
+    setBusy(false); controller = null; loadConversations();
+  }
+}
+
+function setBusy(b) {
+  $("send").textContent = b ? "Stop" : "Send";
+  $("send").type = b ? "button" : "submit";
+}
+$("send").addEventListener("click", (e) => { if (controller) { e.preventDefault(); controller.abort(); } });
+$("form").onsubmit = (e) => {
+  e.preventDefault();
+  const text = $("input").value.trim();
+  if (!text || controller) return;
+  $("input").value = ""; autosize();
+  send(text);
+};
+const autosize = () => { const t = $("input"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 200) + "px"; };
+$("input").addEventListener("input", autosize);
+$("input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("form").requestSubmit(); } });
+
+emptyState();
+loadConversations();
+</script>
+</body>
+</html>
