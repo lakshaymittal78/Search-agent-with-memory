@@ -20,14 +20,6 @@ Optional: run `npm run seed` to create demo history (Postgres hosting last Tuesd
 - "Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?"
 - "What did I ask you on 3 November? Is your answer still correct today?"
 
-## Search providers
-
-| Provider | Free allowance | Key |
-|---|---|---|
-| [Brave Search API](https://brave.com/search/api/) | $5 credit per month (~1,000 queries), card required | `BRAVE_API_KEY` |
-| [Tavily](https://tavily.com/) | 1,000 credits per month, no card | `TAVILY_API_KEY` |
-
-Set either one. If both are set, Brave is used unless `SEARCH_PROVIDER=tavily`.
 
 ## Layout
 
